@@ -130,7 +130,7 @@ def make_tensor_parallel(
     for tp_shard in tp_block.module_shards:
         for submodule in tp_shard.modules():
             if isinstance(submodule, model_config.attn_class):
-                total_heads += submodule.num_heads
+                total_heads += model_config.num_attention_heads
     assert total_heads == model_config.num_attention_heads
     return tp_block
 

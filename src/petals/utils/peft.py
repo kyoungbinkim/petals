@@ -15,7 +15,8 @@ from peft.tuners import lora
 from peft.utils import CONFIG_NAME, SAFETENSORS_WEIGHTS_NAME
 from safetensors import safe_open
 from safetensors.torch import load_file
-from transformers.utils import get_file_from_repo
+from huggingface_hub import hf_hub_download
+from huggingface_hub.utils import LocalEntryNotFoundError
 
 from petals.server.block_utils import get_model_block, resolve_block_dtype
 from petals.utils.convert_block import QuantType
@@ -56,13 +57,15 @@ def get_adapter_from_repo(
     token: Optional[Union[str, bool]] = None,
     **kwargs,
 ):
-    config_path = get_file_from_repo(repo_id, CONFIG_NAME, use_auth_token=token, **kwargs)
-    if config_path is None:
+    try:
+        config_path = hf_hub_download(repo_id, CONFIG_NAME, use_auth_token=token, **kwargs)
+    except LocalEntryNotFoundError:
         raise RuntimeError(f"File {CONFIG_NAME} does not exist in repo {repo_id}")
     config = PeftConfig.from_json_file(config_path)
 
-    weight_path = get_file_from_repo(repo_id, SAFETENSORS_WEIGHTS_NAME, use_auth_token=token, **kwargs)
-    if weight_path is None:
+    try:
+        weight_path = hf_hub_download(repo_id, SAFETENSORS_WEIGHTS_NAME, use_auth_token=token, **kwargs)
+    except LocalEntryNotFoundError:
         raise RuntimeError(f"File {SAFETENSORS_WEIGHTS_NAME} does not exist in repo {repo_id}")
     if block_idx is None:
         return config, load_file(weight_path)

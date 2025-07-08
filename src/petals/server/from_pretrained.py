@@ -17,10 +17,10 @@ import torch.nn as nn
 from accelerate import init_empty_weights
 from accelerate.utils import set_module_tensor_to_device
 from hivemind.utils.logging import get_logger
-from huggingface_hub import get_hf_file_metadata, hf_hub_url
+from huggingface_hub import get_hf_file_metadata, hf_hub_url, hf_hub_download
 from huggingface_hub.utils import EntryNotFoundError
 from transformers import PretrainedConfig, PreTrainedModel
-from transformers.utils import get_file_from_repo
+from huggingface_hub.utils import LocalEntryNotFoundError
 
 from petals.constants import DTYPE_MAP
 from petals.models.mixtral import WrappedMixtralBlock
@@ -92,8 +92,9 @@ def _load_state_dict_from_repo(
 
     index_file = _find_index_file(model_name, revision=revision, token=token, cache_dir=cache_dir)
     if index_file.endswith(".index.json"):  # Sharded model
-        path = get_file_from_repo(model_name, filename=index_file, use_auth_token=token, cache_dir=cache_dir)
-        if path is None:
+        try:
+            path = hf_hub_download(model_name, filename=index_file, use_auth_token=token, cache_dir=cache_dir)
+        except LocalEntryNotFoundError:
             # _find_index_file() told that a file exists but we can't get it (e.g., it just disappeared)
             raise ValueError(f"Failed to get file {index_file}")
 
@@ -136,16 +137,19 @@ def _find_index_file(
 ) -> str:
     # If we have cached weights (e.g., Pickle from older Petals versions), reuse them
     for filename in INDEX_FILES:
-        path = get_file_from_repo(
-            model_name,
-            filename,
-            revision=revision,
-            use_auth_token=token,
-            cache_dir=cache_dir,
-            local_files_only=True,
-        )
-        if path is not None:
-            return filename
+        try:
+            path = hf_hub_download(
+                model_name,
+                filename,
+                revision=revision,
+                use_auth_token=token,
+                cache_dir=cache_dir,
+                local_files_only=True,
+            )
+            if path is not None:
+                return filename  # or return path
+        except LocalEntryNotFoundError:
+            continue
 
     # If we don't, prefer Safetensors when possible
     # (we don't download files here since we can't account for max_disk_space in case of large files)
@@ -173,7 +177,7 @@ def _load_state_dict_from_repo_file(
     # First, try to find the weights locally
     try:
         with allow_cache_reads(cache_dir):
-            path = get_file_from_repo(
+            path = hf_hub_download(
                 model_name,
                 filename,
                 revision=revision,
@@ -197,7 +201,7 @@ def _load_state_dict_from_repo_file(
                 else:
                     logger.warning(f"Failed to fetch size of file {filename} from repo {model_name}")
 
-                path = get_file_from_repo(
+                path = hf_hub_download(
                     model_name,
                     filename,
                     revision=revision,

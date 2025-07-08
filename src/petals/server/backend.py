@@ -68,7 +68,7 @@ class TransformerBackend(ModuleBackend):
         for shard in self.module.module_shards:
             for submodule in shard.modules():
                 if isinstance(submodule, config.attn_class):
-                    self.shard_num_heads.append(submodule.num_heads)
+                    self.shard_num_heads.append(config.num_attention_heads)
         assert len(self.shard_num_heads) == len(self.module.devices)
         assert sum(self.shard_num_heads) == config.num_attention_heads
 
