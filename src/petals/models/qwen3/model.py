@@ -109,7 +109,7 @@ class DistributedQwen3Model(FromPretrainedMixin, PTuneMixin, Qwen3Model):
 
         return BaseModelOutputWithPast(
             last_hidden_state=hidden_states,
-            past_key_values=past_key_values,
+            # past_key_values=past_key_values,
             hidden_states=None,
             attentions=None,
         )
