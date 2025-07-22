@@ -18,6 +18,7 @@ from transformers.models.llama.modeling_llama import (
     LlamaRMSNorm,
     repeat_kv,
     rotate_half,
+    LlamaRotaryEmbedding
 )
 
 from petals.utils.cuda_graphs import make_inference_graphed_callable
@@ -32,7 +33,12 @@ def apply_rotary_pos_emb(q, k, cos, sin):
 class OptimizedLlamaAttention(LlamaAttention):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.attention_dropout = self.config.attention_dropout
+        self.hidden_size = self.config.hidden_size
+        self.num_key_value_heads = self.config.num_key_value_heads
+        self.num_heads= self.config.num_attention_heads
         self._rotary_graph = None
+        self.rotary_emb = LlamaRotaryEmbedding(self.config)
 
     def _optimized_apply_rotary(self, query_states, key_states, cos, sin):
         if self._rotary_graph is None:
@@ -165,19 +171,7 @@ class OptimizedLlamaDecoderLayer(LlamaDecoderLayer):
         cache_position: Optional[torch.LongTensor] = None,
         **kwargs,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
-        """
-        Args:
-            hidden_states (`torch.FloatTensor`): input to the layer of shape `(batch, seq_len, embed_dim)`
-            attention_mask (`torch.FloatTensor`, *optional*): attention mask of size
-                `(batch, 1, tgt_len, src_len)` where padding elements are indicated by very large negative values.
-            output_attentions (`bool`, *optional*):
-                Whether or not to return the attentions tensors of all attention layers. See `attentions` under
-                returned tensors for more detail.
-            use_cache (`bool`, *optional*):
-                If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding
-                (see `past_key_values`).
-            past_key_value (`Tuple(torch.FloatTensor)`, *optional*): cached past key and value projection states
-        """
+     
 
         residual = hidden_states
 
@@ -246,7 +240,6 @@ class WrappedLlamaBlock(OptimizedLlamaDecoderLayer):
 
         assert position_ids is None
 
-        # embed positions
         if attention_mask is None:
             attention_mask = torch.ones(
                 (batch_size, seq_length_with_past), dtype=torch.bool, device=hidden_states.device

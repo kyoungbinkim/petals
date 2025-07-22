@@ -5,6 +5,7 @@ from accelerate import init_empty_weights
 from transformers import PretrainedConfig, PreTrainedModel
 
 from petals.models.mixtral.block import WrappedMixtralBlock
+from petals.models.qwen3.block import WrappedQwen3Block
 from petals.utils.convert_block import QuantType
 from petals.utils.misc import get_size_in_bytes
 
@@ -59,7 +60,7 @@ def get_model_block(config, layer_idx: int = 0):
     kwargs argument **only** is necessary for specific classes, like Mixtral.
     They will not be passed to other block constructors.
     """
-    if config.block_class == WrappedMixtralBlock:
+    if config.block_class == WrappedMixtralBlock or config.block_class == WrappedQwen3Block:
         config = PreTrainedModel._autoset_attn_implementation(config)
         return config.block_class(config, layer_idx)
     return config.block_class(config)

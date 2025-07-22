@@ -8,13 +8,13 @@ from transformers.models.qwen3.modeling_qwen3 import Qwen3Attention
 from petals.client.config import ClientConfig
 from petals.client.lm_head import LMHeadConfig
 from petals.client.ptune import PTuneConfig
-from petals.models.qwen.block import WrappedQwenBlock
+from petals.models.qwen3.block import WrappedQwen3Block
 
 logger = get_logger(__name__)
 
 
-class DistributedQwenConfig(Qwen3Config, ClientConfig, PTuneConfig, LMHeadConfig):
-    block_class = WrappedQwenBlock
+class DistributedQwen3Config(Qwen3Config, ClientConfig, PTuneConfig, LMHeadConfig):
+    block_class = WrappedQwen3Block
     attn_class = Qwen3Attention
     block_prefix = "model.layers"
 

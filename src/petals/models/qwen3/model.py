@@ -12,20 +12,20 @@ from petals.client.lm_head import LMHead
 from petals.client.ptune import PTuneMixin
 from petals.client.remote_generation import RemoteGenerationMixin, RemotePastKeyValues
 from petals.client.remote_sequential import RemoteSequential
-from petals.models.qwen.config import DistributedQwenConfig
+from petals.models.qwen3.config import DistributedQwen3Config
 
 logger = get_logger(__name__)
 
 
-class DistributedQwenModel(FromPretrainedMixin, PTuneMixin, Qwen3Model):
+class DistributedQwen3Model(FromPretrainedMixin, PTuneMixin, Qwen3Model):
     """QwenModel, but all transformer layers are hosted by the swarm"""
 
     _keys_to_ignore_on_load_missing = PTuneMixin._keys_to_ignore_on_load_missing
     _keys_to_ignore_on_load_unexpected = [r"^model\.layers\."]
 
-    config_class = DistributedQwenConfig
+    config_class = DistributedQwen3Config
 
-    def __init__(self, config: DistributedQwenConfig, *, dht: Optional[hivemind.DHT] = None):
+    def __init__(self, config: DistributedQwen3Config, *, dht: Optional[hivemind.DHT] = None):
         n_layer, config.num_hidden_layers = config.num_hidden_layers, 0  # Prevent initialization
         super().__init__(config)
         assert len(self.layers) == 0
@@ -87,6 +87,7 @@ class DistributedQwenModel(FromPretrainedMixin, PTuneMixin, Qwen3Model):
         hidden_states = inputs_embeds
         output_shape = input_shape + (hidden_states.size(-1),)
 
+                        
         hidden_states = self.layers(
             hidden_states,
             prompts=intermediate_prompts,
@@ -97,10 +98,11 @@ class DistributedQwenModel(FromPretrainedMixin, PTuneMixin, Qwen3Model):
             past_key_values = RemotePastKeyValues()
         past_key_values.update_seen(hidden_states.size(1))
 
+
         # Remove prefix
         if use_prompts:
             hidden_states = hidden_states[:, self.pre_seq_len :]
-
+        
         # Add last hidden state
         hidden_states = self.norm(hidden_states)
         hidden_states = hidden_states.view(output_shape)
@@ -129,15 +131,15 @@ class DistributedQwenModel(FromPretrainedMixin, PTuneMixin, Qwen3Model):
         return self.norm
 
 
-class DistributedQwenForCausalLM(FromPretrainedMixin, RemoteGenerationMixin, Qwen3ForCausalLM):
-    _keys_to_ignore_on_load_missing = DistributedQwenModel._keys_to_ignore_on_load_missing
-    _keys_to_ignore_on_load_unexpected = DistributedQwenModel._keys_to_ignore_on_load_unexpected
+class DistributedQwen3ForCausalLM(FromPretrainedMixin, RemoteGenerationMixin, Qwen3ForCausalLM):
+    _keys_to_ignore_on_load_missing = DistributedQwen3Model._keys_to_ignore_on_load_missing
+    _keys_to_ignore_on_load_unexpected = DistributedQwen3Model._keys_to_ignore_on_load_unexpected
 
-    config_class = DistributedQwenConfig
+    config_class = DistributedQwen3Config
 
-    def __init__(self, config: DistributedQwenConfig):
+    def __init__(self, config: DistributedQwen3Config):
         Qwen3PreTrainedModel.__init__(self, config)
-        self.model = DistributedQwenModel(config)
+        self.model = DistributedQwen3Model(config)
         self.pretraining_tp = config.pretraining_tp
         self.vocab_size = config.vocab_size
         self.lm_head = LMHead(config)
@@ -149,5 +151,5 @@ class DistributedQwenForCausalLM(FromPretrainedMixin, RemoteGenerationMixin, Qwe
         return self.lm_head
 
     @property
-    def transformer(self) -> DistributedQwenModel:  # For compatibility with RemoteGenerationMixin
+    def transformer(self) -> DistributedQwen3Model:  # For compatibility with RemoteGenerationMixin
         return self.model
