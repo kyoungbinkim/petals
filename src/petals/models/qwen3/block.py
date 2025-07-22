@@ -1,4 +1,5 @@
 import math
+import time
 from typing import Optional, Tuple
 
 import torch
@@ -19,9 +20,12 @@ from transformers.models.qwen3.modeling_qwen3 import (
     eager_attention_forward
 )
 from transformers.cache_utils import Cache, DynamicCache
-
+from hivemind.utils import get_logger
 
 from petals.utils.cuda_graphs import make_inference_graphed_callable
+
+logger = get_logger(__name__)
+
 
 class OptimizedQwen3Attention(Qwen3Attention):
     def __init__(self, config: Qwen3Config, layer_idx: Optional[int] = None):
@@ -130,6 +134,7 @@ class OptimizedQwen3DecoderLayer(Qwen3DecoderLayer):
 
         self.pre_attn_graph = None
         self.post_attn_graph = None
+        self.layer_idx = layer_idx
 
     def _optimized_input_layernorm(self, hidden_states):
         if self.pre_attn_graph is None:
@@ -216,6 +221,7 @@ class WrappedQwen3Block(OptimizedQwen3DecoderLayer):
         use_cache: bool = False,
         **kwargs,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+        start_time = time.time()
         batch_size, seq_length, _ = hidden_states.shape
 
         seq_length_with_past = seq_length
@@ -259,7 +265,9 @@ class WrappedQwen3Block(OptimizedQwen3DecoderLayer):
                 present_key_value, batch_size, seq_length_with_past
             )
             outputs = outputs[:-1] + (present_key_value,)
-
+        execution_time = time.time() - start_time
+        logger.info(f"Qwen3{self.layer_idx} : {execution_time:.6f} 초")
+        
         return outputs
 
     def _reorder_cache_from_bloom_to_qwen3(
