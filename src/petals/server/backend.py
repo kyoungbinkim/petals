@@ -88,6 +88,7 @@ class TransformerBackend(ModuleBackend):
     def get_inference_cache_descriptors(self, batch_size: int, max_length: int) -> Sequence[TensorDescriptor]:
         """Create tensor descriptors for attention cache tensors used during inference_step"""
         head_dim = self.config.hidden_size // self.config.num_attention_heads
+        head_dim = self.config.head_dim
         cache_tensors = []
         for device, num_heads in zip(self.module.devices, self.shard_num_heads):
             num_heads //= self.config.num_key_value_groups
@@ -140,14 +141,14 @@ class TransformerBackend(ModuleBackend):
                     output_hidden_states = output_hidden_states_chunk  # saves one memcopy
                 layer_past = new_kvs
 
-            print(f"""
-                  cache_tensors : {len(cache_tensors)}
-                  cache_tensors[0] : {cache_tensors[0].shape}
-                  cache_tensors[1] : {cache_tensors[1].shape}
-                    new_kvs : {len(new_kvs)}
-                    new_kvs[0] : {new_kvs[0].shape}
-                    new_kvs[1] : {new_kvs[1].shape}
-                  """)
+            # print(f"""
+            #       cache_tensors : {len(cache_tensors)}
+            #       cache_tensors[0] : {cache_tensors[0].shape}
+            #       cache_tensors[1] : {cache_tensors[1].shape}
+            #         new_kvs : {len(new_kvs)}
+            #         new_kvs[0] : {new_kvs[0].shape}
+            #         new_kvs[1] : {new_kvs[1].shape}
+            #       """)
             
             
             self._update_cache_inplace(cache_tensors, new_kvs, inference_info.prefix_length)
