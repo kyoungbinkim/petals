@@ -129,7 +129,7 @@ def _load_state_dict_from_repo(
     return state_dict
 
 
-INDEX_FILES = ["model.safetensors.index.json", "model.safetensors", "pytorch_model.bin.index.json", "pytorch_model.bin"]
+INDEX_FILES = ["model.safetensors.index.json", "model.safetensors" ]
 
 
 def _find_index_file(
