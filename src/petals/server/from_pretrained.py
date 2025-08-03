@@ -7,6 +7,7 @@ If necessary, one can rewrite this to implement a different behavior, such as:
 
 """
 import json
+import os
 import time
 from contextlib import suppress
 from typing import Dict, Optional, Union
@@ -92,11 +93,17 @@ def _load_state_dict_from_repo(
 
     index_file = _find_index_file(model_name, revision=revision, token=token, cache_dir=cache_dir)
     if index_file.endswith(".index.json"):  # Sharded model
-        try:
-            path = hf_hub_download(model_name, filename=index_file, use_auth_token=token, cache_dir=cache_dir)
-        except LocalEntryNotFoundError:
-            # _find_index_file() told that a file exists but we can't get it (e.g., it just disappeared)
-            raise ValueError(f"Failed to get file {index_file}")
+        # Check if this is a local path
+        if model_name.startswith('/') or model_name.startswith('./') or model_name.startswith('../'):
+            path = os.path.join(model_name, index_file)
+            if not os.path.exists(path):
+                raise ValueError(f"Failed to get file {index_file} from local path {model_name}")
+        else:
+            try:
+                path = hf_hub_download(model_name, filename=index_file, use_auth_token=token, cache_dir=cache_dir)
+            except LocalEntryNotFoundError:
+                # _find_index_file() told that a file exists but we can't get it (e.g., it just disappeared)
+                raise ValueError(f"Failed to get file {index_file}")
 
         with open(path) as f:
             index = json.load(f)
@@ -135,6 +142,17 @@ INDEX_FILES = ["model.safetensors.index.json", "model.safetensors" ]
 def _find_index_file(
     model_name: str, *, revision: Optional[str] = None, token: Optional[Union[str, bool]] = None, cache_dir: str
 ) -> str:
+    # Check if this is a local path
+    if model_name.startswith('/') or model_name.startswith('./') or model_name.startswith('../'):
+        # For local paths, check if the files exist directly
+        for filename in INDEX_FILES:
+            local_path = os.path.join(model_name, filename)
+            if os.path.exists(local_path):
+                return filename
+        raise ValueError(
+            f"Local directory {model_name} does not contain weights in a supported format: files {INDEX_FILES} do not exist"
+        )
+    
     # If we have cached weights (e.g., Pickle from older Petals versions), reuse them
     for filename in INDEX_FILES:
         try:
@@ -174,6 +192,14 @@ def _load_state_dict_from_repo_file(
     max_disk_space: Optional[int] = None,
     delay: float = 30,
 ) -> StateDict:
+    # Check if this is a local path
+    if model_name.startswith('/') or model_name.startswith('./') or model_name.startswith('../'):
+        local_path = os.path.join(model_name, filename)
+        if os.path.exists(local_path):
+            return _load_state_dict_from_local_file(local_path, block_prefix=block_prefix)
+        else:
+            raise RuntimeError(f"File {filename} does not exist in local directory {model_name}")
+    
     # First, try to find the weights locally
     try:
         with allow_cache_reads(cache_dir):
