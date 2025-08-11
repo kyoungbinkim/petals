@@ -42,6 +42,9 @@ class _AutoDistributedBase:
             kwargs["use_auth_token"] = True
 
         config = AutoConfig.from_pretrained(model_name_or_path, *args, **kwargs)
+        
+        print(f"[DEBUG] AutoDistributedBase.from_pretrained: model_name_or_path={model_name_or_path}, config={config}")
+        
         if config.model_type not in _CLASS_MAPPING:
             raise ValueError(f"Petals does not support model type {config.model_type}")
 
